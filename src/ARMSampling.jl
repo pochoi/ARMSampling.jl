@@ -179,7 +179,7 @@ function sample!(proposal::TrapezoidalProposal{T}, logf::Function, x0::T; max_n 
     end
 end
 
-function sample!(out::Vector{T}, nsample::Int64, proposal::TrapezoidalProposal{T}, logf::Function; kwargs...) where T
+function sample!(out::Vector{T}, nsample::Int, proposal::TrapezoidalProposal{T}, logf::Function; kwargs...) where T
     nout = length(out)
     append!(out, zeros(T, nsample))
     for i in 1:nsample
@@ -189,7 +189,7 @@ function sample!(out::Vector{T}, nsample::Int64, proposal::TrapezoidalProposal{T
 end
 
 
-function overrelaxation!(proposal::TrapezoidalProposal{T}, logf::Function, x0::T, K::Int64; max_n = 2*length(proposal), max_try = 10*length(proposal)) where T
+function overrelaxation!(proposal::TrapezoidalProposal{T}, logf::Function, x0::T, K::Int; max_n = 2*length(proposal), max_try = 10*length(proposal)) where T
 
     x = x0
     max_try_counter = 0

@@ -12,4 +12,4 @@ notifications:
 #  - julia -e 'Pkg.clone(pwd()); Pkg.build("ARMSampling"); Pkg.test("ARMSampling"; coverage=true)';
 after_success:
   - julia -e 'cd(Pkg.dir("ARMSampling")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())';
-#  - julia -e 'cd(Pkg.dir("ARMSampling")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())';
+  - julia -e 'cd(Pkg.dir("ARMSampling")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())';
