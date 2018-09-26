@@ -1,11 +1,11 @@
 module ARMSampling
 
 import Base: length, copy, insert!
-export TrapezoidalProposal, sample, sample!
+export TrapezoidalProposal, sample, sample!, overrelaxation!
 
 
 #From StatsBase.jl/src/sampling.jl
-function sample(w)
+function _sample(w)
     t = rand() * sum(w)
     n = length(w)
     i = 1
@@ -15,19 +15,6 @@ function sample(w)
         @inbounds cw += w[i]
     end
     return i
-end
-
-function rank(out)
-    x0 = out[1]
-    sorted_out = sort(out)
-    index = searchsorted(sorted_out, x0)
-
-    if index.start == index.stop
-        r = index.start - 1
-    else
-        r = sample(index) - 1
-    end
-    return r, sorted_out
 end
 
 slope(x0, x1, y0, y1) = (y1-y0)/(x1-x0)
@@ -66,7 +53,7 @@ end
 
 function TrapezoidalProposal(x::AbstractVector{T}, y::AbstractVector{T}) where T
     w = trapezoidalweight(x, y)
-    return TrapezoidalProposal{T,typeof(x)}(x, y, w)
+    return TrapezoidalProposal{T,typeof(x)}(copy(x), copy(y), copy(w))
 end
 
 function TrapezoidalProposal(x::AbstractVector{T}, logf::Function) where T
@@ -135,22 +122,26 @@ function sample(proposal::TrapezoidalProposal)
     w = proposal.w
 
     n = length(proposal)
-    k = sample(w)
+    k = _sample(w)
 
     a, b = slope_intercept(x[k], x[k+1], y[k], y[k+1])
     if abs(a) < eps(typeof(a))
         return rand()*w[k]*exp(-b) + x[k]
     end
 
-    out = log(rand()*w[k]*a*exp(-b)+exp(a*x[k]))/a
+    #out = log(rand()*w[k]*a*exp(-b)+exp(a*x[k]))/a
+    out = (log(rand()*w[k]*a + exp(y[k]))-b)/a
     if !isfinite(out)
         println()
-        error("Got infinity! k = $k, a = $a, b = $b")
+        error("Got infinity! k = $k, a = $a, b = $b, w = $(w[k])")
     end
     return out
 end
 
-function sample!(proposal::TrapezoidalProposal{T}, logf::Function, x0::T; max_n = 2*length(proposal)) where T
+function sample!(proposal::TrapezoidalProposal{T}, 
+                 logf::Function, 
+                 x0::T; 
+                 max_n = 2*length(proposal)) where T
     logfx0 = logf(x0)
     logfx = zero(T)
     x = zero(T)
@@ -179,7 +170,11 @@ function sample!(proposal::TrapezoidalProposal{T}, logf::Function, x0::T; max_n 
     end
 end
 
-function sample!(out::Vector{T}, nsample::Int, proposal::TrapezoidalProposal{T}, logf::Function; kwargs...) where T
+function sample!(out::Vector{T}, 
+                 nsample::Integer,
+                 proposal::TrapezoidalProposal{T},
+                 logf::Function;
+                 kwargs...) where T
     nout = length(out)
     append!(out, zeros(T, nsample))
     for i in 1:nsample
@@ -188,9 +183,25 @@ function sample!(out::Vector{T}, nsample::Int, proposal::TrapezoidalProposal{T},
     return out
 end
 
+function rank(out)
+    x0 = out[1]
+    sorted_out = sort(out)
+    index = searchsorted(sorted_out, x0)
 
-function overrelaxation!(proposal::TrapezoidalProposal{T}, logf::Function, x0::T, K::Int; max_n = 2*length(proposal), max_try = 10*length(proposal)) where T
+    if index.start == index.stop
+        r = index.start - 1
+    else
+        r = (index.start - 1) + _sample(ones(length(index))) - 1
+    end
+    return r, sorted_out
+end
 
+function overrelaxation!(proposal::TrapezoidalProposal{T},
+                         logf::Function,
+                         x0::T,
+                         K::Integer;
+                         max_n = 2*length(proposal),
+                         max_try = 10*length(proposal)) where T
     x = x0
     max_try_counter = 0
     while max_try_counter < max_try && length(proposal) < max_n
@@ -202,8 +213,7 @@ function overrelaxation!(proposal::TrapezoidalProposal{T}, logf::Function, x0::T
     sample!(out, 2*K, proposal, logf; max_n = max_n)
     out = out[1:2:end]
     r, sorted_out = rank(out)
-
-    return sorted_out[K-r+1]
+    return sorted_out[K-r+1], sorted_out
 end
 
 end # module
